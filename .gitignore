@@ -410,6 +410,13 @@ FodyWeavers.xsd
 # Local History for Visual Studio Code
 .history/
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
 # Built Visual Studio Code Extensions
 *.vsix
 
