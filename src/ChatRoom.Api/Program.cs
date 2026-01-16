@@ -53,7 +53,16 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // maps /register, /login, /logout, etc.
+// Use /login?useCookies=true for cookie-based auth (used by React app and SignalR)
 app.MapIdentityApi<IdentityUser>();
+
+// Endpoint to get info about the current user
+app.MapGet("/api/me", (HttpContext ctx) 
+    => Results.Ok(
+        new
+        {
+            user = ctx.User.Identity?.Name, authenticated = ctx.User.Identity?.IsAuthenticated 
+        })).RequireAuthorization();
 
 // SignalR hub endpoint
 app.MapHub<ChatHub>("/hubs/chat");
