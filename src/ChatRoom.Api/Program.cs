@@ -25,12 +25,24 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 //SignalR
-builder.Services.AddSignalR();
+builder.Services.AddSignalR().AddJsonProtocol(o =>
+{
+    o.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+});
+
+// for minimal api JSON camelCase too (recommended)
+builder.Services.ConfigureHttpJsonOptions(o =>
+{
+    o.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+});
 
 // RabbitMQ connection factory
 builder.Services.AddSingleton<RabbitMqConnectionFactory>();
 // Stock command publisher
 builder.Services.AddSingleton<StockCommandPublisher>();
+
+// Stock result consumer (background service)
+builder.Services.AddHostedService<StockResultConsumer>();
 
 var app = builder.Build();
 

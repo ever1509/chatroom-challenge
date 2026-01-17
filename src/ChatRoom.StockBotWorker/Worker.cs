@@ -1,23 +1,125 @@
+using System.Text;
+using System.Text.Json;
+using ChatRoom.StockBotWorker.Contracts;
+using ChatRoom.StockBotWorker.Services;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+
 namespace ChatRoom.StockBotWorker;
 
 public class Worker : BackgroundService
 {
-    private readonly ILogger<Worker> _logger;
+    private const string CommandsQueue = "stock.commands";
+    private const string ResultsQueue = "stock.results";
 
-    public Worker(ILogger<Worker> logger)
+    private readonly ILogger<Worker> _logger;
+    private readonly IHttpClientFactory _http;
+    private readonly RabbitMqConnectionFactory _rmq;
+
+    private IConnection? _conn;
+    private IChannel? _channel;
+
+    private readonly JsonSerializerOptions _json = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    public Worker(ILogger<Worker> logger, IHttpClientFactory http, RabbitMqConnectionFactory rmq)
     {
         _logger = logger;
+        _http = http;
+        _rmq = rmq;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        _conn = await _rmq.CreateConnectionAsync();
+        _channel = await _conn.CreateChannelAsync(cancellationToken: stoppingToken);
+
+        await _channel.QueueDeclareAsync(CommandsQueue, durable: true, exclusive: false, autoDelete: false, arguments: null, cancellationToken: stoppingToken);
+        await _channel.QueueDeclareAsync(ResultsQueue, durable: true, exclusive: false, autoDelete: false, arguments: null, cancellationToken: stoppingToken);
+
+        await _channel.BasicQosAsync(0, 1, false, stoppingToken);
+
+        var consumer = new AsyncEventingBasicConsumer(_channel);
+        consumer.ReceivedAsync += async (_, ea) =>
         {
-            if (_logger.IsEnabled(LogLevel.Information))
+            try
             {
-                _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                var cmd = JsonSerializer.Deserialize<StockCommand>(Encoding.UTF8.GetString(ea.Body.ToArray()), _json);
+                if (cmd is null)
+                {
+                    await _channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
+                    return;
+                }
+
+                var text = await GetQuoteText(cmd.StockCode, stoppingToken);
+
+                var result = new StockResult(
+                    RoomId: cmd.RoomId,
+                    Text: text,
+                    CorrelationId: cmd.CorrelationId,
+                    TimeStamp: DateTime.UtcNow
+                );
+
+                var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(result, _json));
+                var props = new BasicProperties { Persistent = true, CorrelationId = result.CorrelationId };
+
+                await _channel.BasicPublishAsync("", ResultsQueue, false, props, body, stoppingToken);
+                await _channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
             }
-            await Task.Delay(1000, stoppingToken);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Bot failed processing message");
+                await _channel!.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
+            }
+        };
+
+        await _channel.BasicConsumeAsync(CommandsQueue, autoAck: false, consumer: consumer, cancellationToken: stoppingToken);
+        await Task.Delay(Timeout.Infinite, stoppingToken);
+    }
+    
+    private async Task<string> GetQuoteText(string stockCode, CancellationToken ct)
+    {
+        var code = stockCode.Trim();
+        var url = $"https://stooq.com/q/l/?s={Uri.EscapeDataString(code)}&f=sd2t2ohlcv&h&e=csv";
+
+        try
+        {
+            var client = _http.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+
+            var csv = await client.GetStringAsync(url, ct);
+            var price = TryParseClosePrice(csv);
+            var upper = code.ToUpperInvariant();
+
+            return price is not null
+                ? $"{upper} quote is ${price} per share"
+                : $"Could not retrieve quote for {upper}";
         }
+        catch
+        {
+            return $"Could not retrieve quote for {code.ToUpperInvariant()}";
+        }
+    }
+
+    private static string? TryParseClosePrice(string csv)
+    {
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (lines.Length < 2) return null;
+
+        var header = lines[0].Split(',', StringSplitOptions.TrimEntries);
+        var row = lines[1].Split(',', StringSplitOptions.TrimEntries);
+        if (header.Length != row.Length) return null;
+
+        var closeIdx = Array.FindIndex(header, h => h.Equals("Close", StringComparison.OrdinalIgnoreCase));
+        if (closeIdx < 0) return null;
+
+        var close = row[closeIdx];
+        if (string.IsNullOrWhiteSpace(close) || close.Equals("N/D", StringComparison.OrdinalIgnoreCase)) return null;
+
+        return decimal.TryParse(close, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d)
+            ? d.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : null;
     }
 }
