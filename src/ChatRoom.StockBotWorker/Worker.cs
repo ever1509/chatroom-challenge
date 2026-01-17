@@ -90,7 +90,7 @@ public class Worker : BackgroundService
             client.Timeout = TimeSpan.FromSeconds(10);
 
             var csv = await client.GetStringAsync(url, ct);
-            var price = TryParseClosePrice(csv);
+            var price = StooqCsvParser.TryParseClosePrice(csv);
             var upper = code.ToUpperInvariant();
 
             return price is not null
@@ -101,25 +101,5 @@ public class Worker : BackgroundService
         {
             return $"Could not retrieve quote for {code.ToUpperInvariant()}";
         }
-    }
-
-    private static string? TryParseClosePrice(string csv)
-    {
-        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (lines.Length < 2) return null;
-
-        var header = lines[0].Split(',', StringSplitOptions.TrimEntries);
-        var row = lines[1].Split(',', StringSplitOptions.TrimEntries);
-        if (header.Length != row.Length) return null;
-
-        var closeIdx = Array.FindIndex(header, h => h.Equals("Close", StringComparison.OrdinalIgnoreCase));
-        if (closeIdx < 0) return null;
-
-        var close = row[closeIdx];
-        if (string.IsNullOrWhiteSpace(close) || close.Equals("N/D", StringComparison.OrdinalIgnoreCase)) return null;
-
-        return decimal.TryParse(close, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d)
-            ? d.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            : null;
     }
 }
