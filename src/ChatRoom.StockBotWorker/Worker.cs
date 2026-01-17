@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
-using ChatRoom.StockBotWorker.Contracts;
+using ChatRoom.Shared.Contracts;
+using ChatRoom.Shared.Parsing;
 using ChatRoom.StockBotWorker.Services;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;

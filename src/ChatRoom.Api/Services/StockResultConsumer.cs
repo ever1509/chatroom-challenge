@@ -1,9 +1,9 @@
 using System.Text;
 using System.Text.Json;
-using ChatRoom.Api.Contracts;
 using ChatRoom.Api.Data;
 using ChatRoom.Api.Hubs;
 using ChatRoom.Api.Models;
+using ChatRoom.Shared.Contracts;
 using Microsoft.AspNetCore.SignalR;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;

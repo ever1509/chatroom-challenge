@@ -1,4 +1,4 @@
-using ChatRoom.Api.Services;
+using ChatRoom.Shared.Parsing;
 using FluentAssertions;
 
 namespace ChatRoom.Tests.Parsers;

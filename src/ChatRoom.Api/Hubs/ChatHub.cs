@@ -1,8 +1,9 @@
 using System.Security.Claims;
-using ChatRoom.Api.Contracts;
 using ChatRoom.Api.Data;
 using ChatRoom.Api.Models;
 using ChatRoom.Api.Services;
+using ChatRoom.Shared.Contracts;
+using ChatRoom.Shared.Parsing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;

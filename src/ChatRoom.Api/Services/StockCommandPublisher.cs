@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using ChatRoom.Api.Contracts;
+using ChatRoom.Shared.Contracts;
 using RabbitMQ.Client;
 
 namespace ChatRoom.Api.Services;

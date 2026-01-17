@@ -1,4 +1,4 @@
-using ChatRoom.StockBotWorker.Services;
+using ChatRoom.Shared.Parsing;
 using FluentAssertions;
 
 namespace ChatRoom.Tests.Csv;
