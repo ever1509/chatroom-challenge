@@ -1,6 +1,7 @@
 using ChatRoom.Api.Data;
 using ChatRoom.Api.Hubs;
 using ChatRoom.Api.Models;
+using ChatRoom.Api.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +26,11 @@ builder.Services.AddSwaggerGen();
 
 //SignalR
 builder.Services.AddSignalR();
+
+// RabbitMQ connection factory
+builder.Services.AddSingleton<RabbitMqConnectionFactory>();
+// Stock command publisher
+builder.Services.AddSingleton<StockCommandPublisher>();
 
 var app = builder.Build();
 

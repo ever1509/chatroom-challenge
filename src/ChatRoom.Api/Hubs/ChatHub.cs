@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using ChatRoom.Api.Contracts;
 using ChatRoom.Api.Data;
 using ChatRoom.Api.Models;
+using ChatRoom.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -11,10 +13,12 @@ namespace ChatRoom.Api.Hubs;
 public class ChatHub : Hub
 {
     private readonly ChatDbContext _db;
+    private readonly StockCommandPublisher _publisher;
 
-    public ChatHub(ChatDbContext db)
+    public ChatHub(ChatDbContext db, StockCommandPublisher publisher)
     {
         _db = db;
+        _publisher = publisher;
     }
     
     private static string GroupName(int roomId) => $"room:{roomId}";
@@ -35,6 +39,23 @@ public class ChatHub : Hub
         var userName = user.Identity?.Name ?? "unknown";
         
         if(message.Length > 500) throw new HubException("Message too long (max 500 chars)");
+
+        if (StockCommandParser.TryParse(message, out var stockCode))
+        {
+            var correlationId = Guid.NewGuid().ToString("N");
+            
+            await _publisher.PublishAsync(
+                new StockCommand
+                (
+                    StockCode: stockCode,
+                    RoomId: roomId,
+                    RequestedByUserName: userName,
+                    CorrelationId: correlationId,
+                    TimeStamp: DateTime.UtcNow
+                ),
+                CancellationToken.None);
+            return;
+        }
 
         var msg = new Message
         {
