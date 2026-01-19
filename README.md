@@ -215,3 +215,10 @@ Tests cover:
   * Outbox pattern for message reliability.
   * Retries, backoff strategies, and dead-letter queues.
   * Idempotency handling for broker messages.
+
+
+## Demo Video
+
+A short walkthrough of the solution, architecture, and live demo is available here:
+
+👉 https://www.loom.com/share/1c2ba2a04a884fcebe0cd4601cb73380
